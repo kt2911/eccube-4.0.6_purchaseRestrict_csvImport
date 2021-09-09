@@ -51,6 +51,7 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Symfony\Component\Validator\Constraints\GreaterThanOrEqual;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
+use Plugin\SePurchaseRestrict4\Repository\PurchaseRestrictRepository;
 
 class CsvImportController extends AbstractCsvImportController
 {
@@ -95,6 +96,11 @@ class CsvImportController extends AbstractCsvImportController
     protected $productRepository;
 
     /**
+     * @var PurchaseRestrictRepository
+     */
+    protected $purchaseRestrictRepository;
+
+    /**
      * @var TaxRuleRepository
      */
     private $taxRuleRepository;
@@ -128,6 +134,7 @@ class CsvImportController extends AbstractCsvImportController
      * @param ProductImageRepository $productImageRepository
      * @param ProductStatusRepository $productStatusRepository
      * @param ProductRepository $productRepository
+     * @param PurchaseRestrictRepository $purchaseRestrictRepository
      * @param TaxRuleRepository $taxRuleRepository
      * @param BaseInfoRepository $baseInfoRepository
      * @param ValidatorInterface $validator
@@ -142,6 +149,7 @@ class CsvImportController extends AbstractCsvImportController
         ProductImageRepository $productImageRepository,
         ProductStatusRepository $productStatusRepository,
         ProductRepository $productRepository,
+        PurchaseRestrictRepository $purchaseRestrictRepository,
         TaxRuleRepository $taxRuleRepository,
         BaseInfoRepository $baseInfoRepository,
         ValidatorInterface $validator
@@ -154,6 +162,7 @@ class CsvImportController extends AbstractCsvImportController
         $this->productImageRepository = $productImageRepository;
         $this->productStatusRepository = $productStatusRepository;
         $this->productRepository = $productRepository;
+        $this->purchaseRestrictRepository = $purchaseRestrictRepository;
         $this->taxRuleRepository = $taxRuleRepository;
         $this->BaseInfo = $baseInfoRepository->get();
         $this->validator = $validator;
@@ -343,6 +352,25 @@ class CsvImportController extends AbstractCsvImportController
                                 $Product->setFreeArea(StringUtil::trimAll($row[$headerByKey['free_area']]));
                             } else {
                                 $Product->setFreeArea(null);
+                            }
+                        }
+
+                        if (isset($row[$headerByKey['purchase_restrict_id']])) {
+                            if (strlen($row[$headerByKey['purchase_restrict_id']]) > 0) {
+                                if (preg_match('/^\d+$/', $row[$headerByKey['purchase_restrict_id']])) {
+                                    $PurchaseRestrict = $this->purchaseRestrictRepository->find($row[$headerByKey['purchase_restrict_id']]);
+                                    if (!$PurchaseRestrict) {
+                                        $message = trans('admin.common.csv_invalid_not_found', ['%line%' => $line, '%name%' => $headerByKey['purchase_restrict_id']]);
+                                        $this->addErrors($message);
+                                    } else {
+                                        $Product->setPurchaseRestrictId($row[$headerByKey['purchase_restrict_id']]);
+                                    }
+                                } else {
+                                    $message = trans('admin.common.csv_invalid_not_found', ['%line%' => $line, '%name%' => $headerByKey['purchase_restrict_id']]);
+                                    $this->addErrors($message);
+                                }
+                            } else {
+                                $Product->setPurchaseRestrictId(null);
                             }
                         }
 
@@ -1536,6 +1564,11 @@ class CsvImportController extends AbstractCsvImportController
             trans('admin.product.product_csv.tax_rate_col') => [
                 'id' => 'tax_rate',
                 'description' => 'admin.product.product_csv.tax_rate_description',
+                'required' => false,
+            ],
+            trans('admin.product.product_csv.purchase_restrict_id_col') => [
+                'id' => 'purchase_restrict_id',
+                'description' => 'admin.product.product_csv.purchase_restrict_id_description',
                 'required' => false,
             ],
         ];
